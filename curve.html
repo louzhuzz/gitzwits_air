@@ -204,13 +204,8 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        // 从Cookie获取参数
-        function getCookie(name) {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
-            return null;
-        }
+        // 引入公共工具函数
+        import { getCookie } from './js/utils.js';
 
         // 初始化GizwitsWS对象
         const gizwitsWS = new GizwitsWS(
