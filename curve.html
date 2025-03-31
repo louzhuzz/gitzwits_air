@@ -3,20 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>设备监控页面</title>
+    <link rel="stylesheet" href="curve.css">
     <!-- 使用CDN引入jQuery -->
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <!-- 使用CDN引入Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- 本地引入机智云SDK -->
     <script src="js/gizwits_ws_0.3.0.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .data-panel { margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px; }
-        .data-value { font-size: 24px; font-weight: bold; }
-        .chart-container { width: 100%; max-width: 800px; margin: 20px auto; }
-        .control-panel { margin-top: 20px; padding: 15px; background: #f0f8ff; border-radius: 5px; }
-        button { padding: 8px 15px; margin-right: 10px; cursor: pointer; }
-    </style>
 </head>
 <body>
     <h1>设备监控面板</h1>
@@ -46,7 +39,13 @@
     </div>
     
     <div class="chart-container">
-        <canvas id="data-chart"></canvas>
+        <h3>Value 和 PM 数据</h3>
+        <canvas id="data-chart1"></canvas>
+    </div>
+    
+    <div class="chart-container">
+        <h3>温度和湿度数据</h3>
+        <canvas id="data-chart2"></canvas>
     </div>
     
     <div class="control-panel">
@@ -54,9 +53,9 @@
         <button id="refresh-btn">刷新数据</button>
     </div>
     
-    <div class="log-panel" style="margin-top: 20px;">
+    <div class="log-panel">
         <h3>通信日志</h3>
-        <div id="log-container" style="height: 200px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px;"></div>
+        <div id="log-container"></div>
     </div>
     
     <script>
@@ -69,9 +68,9 @@
         const maxDataPoints = 30; // 图表显示的最大数据点数
         let currentDeviceId = null;
 
-        // 初始化Chart.js图表
-        const ctx = document.getElementById('data-chart').getContext('2d');
-        const dataChart = new Chart(ctx, {
+        // 初始化第一个Chart.js图表 - Value和PM
+        const ctx1 = document.getElementById('data-chart1').getContext('2d');
+        const dataChart1 = new Chart(ctx1, {
             type: 'line',
             data: {
                 labels: timeLabels,
@@ -81,17 +80,44 @@
                         data: valueData,
                         borderColor: 'rgb(75, 192, 192)',
                         backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                        tension: 0.1,
-                        yAxisID: 'y'
+                        tension: 0.1
                     },
                     {
                         label: 'PM',
                         data: pmData,
                         borderColor: 'rgb(255, 99, 132)',
                         backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                        tension: 0.1,
-                        yAxisID: 'y'
-                    },
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: '数值'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // 初始化第二个Chart.js图表 - 温度和湿度
+        const ctx2 = document.getElementById('data-chart2').getContext('2d');
+        const dataChart2 = new Chart(ctx2, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [
                     {
                         label: '温度',
                         data: tempData,
@@ -123,7 +149,7 @@
                         position: 'left',
                         title: {
                             display: true,
-                            text: '数值'
+                            text: '温度(°C)'
                         }
                     },
                     y1: {
@@ -163,8 +189,9 @@
                 timeLabels.shift();
             }
             
-            // 更新图表
-            dataChart.update();
+            // 更新两个图表
+            dataChart1.update();
+            dataChart2.update();
         }
 
         // 日志记录函数
