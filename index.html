@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>机智云设备初始化</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="http://www.gongjuji.net/Content/files/jquery.md5.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+            border: 1px solid #d6e9c6;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+            border: 1px solid #ebccd1;
+        }
+        .info {
+            background-color: #d9edf7;
+            color: #31708f;
+            border: 1px solid #bce8f1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>机智云设备初始化</h1>
+        
+        <div class="form-group">
+            <label for="productKey">Product Key:</label>
+            <input type="text" id="productKey" placeholder="输入产品Product Key">
+        </div>
+        
+        <div class="form-group">
+            <label for="productSecret">Product Secret:</label>
+            <input type="text" id="productSecret" placeholder="输入产品Product Secret">
+        </div>
+        
+        <div class="form-group">
+            <label for="appId">App ID:</label>
+            <input type="text" id="appId" placeholder="输入App ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="mac">设备MAC地址:</label>
+            <input type="text" id="mac" placeholder="输入设备MAC地址">
+        </div>
+        
+        <div class="buttons">
+            <button class="btn" onclick="useLastParams()">保持上次参数</button>
+            <button class="btn" onclick="updateParams()">更新存储参数</button>
+        </div>
+        
+        <div id="message" class="message" style="display: none;"></div>
+    </div>
+
+    <script>
+        // 页面加载时检查是否有缓存参数
+        $(document).ready(function() {
+            // 如果有缓存参数，填充到表单中
+            if(getCookie("productKey")) {
+                $("#productKey").val(getCookie("productKey"));
+                $("#productSecret").val(getCookie("productSecret"));
+                $("#appId").val(getCookie("Appid"));
+                $("#mac").val(getCookie("mac"));
+                
+                showMessage("检测到上次使用的参数已自动填充", "info");
+            } else {
+                showMessage("首次使用请填写参数并点击更新存储参数", "info");
+            }
+        });
+        
+        // 显示消息
+        function showMessage(msg, type) {
+            var $msg = $("#message");
+            $msg.text(msg).removeClass().addClass("message " + type).show();
+        }
+        
+        // 缓存参数到Cookie，有效期一年
+        function setCookie(cname, cvalue) {
+            var d = new Date();
+            d.setTime(d.getTime() + (365 * 24 * 60 * 60 * 1000));
+            var expires = "expires=" + d.toUTCString();
+            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+        }
+        
+        // 获取Cookie
+        function getCookie(cname) {
+            var name = cname + "=";
+            var decodedCookie = decodeURIComponent(document.cookie);
+            var ca = decodedCookie.split(';');
+            for(var i = 0; i < ca.length; i++) {
+                var c = ca[i];
+                while (c.charAt(0) == ' ') {
+                    c = c.substring(1);
+                }
+                if (c.indexOf(name) == 0) {
+                    return c.substring(name.length, c.length);
+                }
+            }
+            return "";
+        }
+        
+        // 使用上次参数
+        function useLastParams() {
+            if(!getCookie("productKey") || !getCookie("Appid") || !getCookie("token")) {
+                showMessage("没有找到上次使用的参数，请先填写参数并点击更新存储参数", "error");
+                return;
+            }
+            
+            // 跳转到设备页面
+            window.location.href = "Curve.html";
+        }
+        
+        // 更新参数
+        function updateParams() {
+            var productKey = $("#productKey").val().trim();
+            var productSecret = $("#productSecret").val().trim();
+            var appId = $("#appId").val().trim();
+            var mac = $("#mac").val().trim();
+            
+            if(!productKey || !productSecret || !appId || !mac) {
+                showMessage("请填写所有参数", "error");
+                return;
+            }
+            
+            // 生成随机phone_id
+            var phone_id = "1512020" + Math.floor(Math.random() * (10000 - 1000) + 1000);
+            
+            showMessage("正在创建匿名用户...", "info");
+            
+            // 1. 创建匿名用户 - 根据API文档修改为正确格式
+            $.ajax({
+                url: "https://api.gizwits.com/app/users",
+                type: "POST",
+                headers: {
+                    "X-Gizwits-Application-Id": appId,
+                    "Content-Type": "application/json"  // 必须添加的请求头
+                },
+                data: JSON.stringify({  // 使用JSON.stringify确保发送JSON格式数据
+                    "phone_id": phone_id,
+                    "lang": "zh-cn"  // 根据API文档建议使用zh-cn
+                }),
+                success: function(result) {
+                    showMessage("匿名用户创建成功，正在绑定设备...", "success");
+                    
+                    // 获取token
+                    var token = result.token;
+                    
+                    // 保存token到Cookie
+                    setCookie("token", token);
+                    
+                    // 2. 绑定设备
+                    setTimeout(function() {
+                        bindDevice(productKey, productSecret, appId, mac, token, phone_id);
+                    }, 1000);
+                },
+                error: function(xhr, status, error) {
+                    var errorMsg = "创建匿名用户失败";
+                    try {
+                        var err = JSON.parse(xhr.responseText);
+                        errorMsg += ": " + (err.error_message || err.message || error);
+                    } catch(e) {
+                        errorMsg += ": " + error;
+                    }
+                    showMessage(errorMsg, "error");
+                    console.log("完整错误响应:", xhr.responseText);
+                }
+            });
+        }
+        
+        // 绑定设备 - 根据API文档修改为正确格式
+        function bindDevice(productKey, productSecret, appId, mac, token, phone_id) {
+            // 获取时间戳
+            var unixTimestamp = Math.round(new Date().getTime() / 1000);
+            
+            // 计算签名
+            var md5PST = $.md5(productSecret + unixTimestamp);
+            
+            $.ajax({
+                url: "https://api.gizwits.com/app/bind_mac",  // 使用https
+                type: "POST",
+                headers: {
+                    "X-Gizwits-Application-Id": appId,
+                    "X-Gizwits-User-token": token,
+                    "X-Gizwits-Timestamp": unixTimestamp,
+                    "X-Gizwits-Signature": md5PST,
+                    "Content-Type": "application/json"  // 必须添加的请求头
+                },
+                data: JSON.stringify({  // 使用JSON.stringify确保发送JSON格式数据
+                    "product_key": productKey,
+                    "mac": mac,
+                    "remark": "网页绑定设备",  // 可选参数
+                    "dev_alias": "网页控制设备"  // 可选参数
+                }),
+                success: function(result) {
+                    // 存储参数到Cookie
+                    setCookie("productKey", productKey);
+                    setCookie("productSecret", productSecret);
+                    setCookie("Appid", appId);
+                    setCookie("mac", mac);
+                    setCookie("phone", phone_id);
+                    setCookie("token", token); // 确保token也被存储
+                    
+                    showMessage("设备绑定成功，正在跳转到设备页面...", "success");
+                    
+                    // 跳转到设备页面
+                    setTimeout(function() {
+                        window.location.href = "Curve.html";
+                    }, 2000);
+                },
+                error: function(xhr, status, error) {
+                    var errorMsg = "设备绑定失败";
+                    try {
+                        var err = JSON.parse(xhr.responseText);
+                        errorMsg += ": " + (err.error_message || err.message || error);
+                    } catch(e) {
+                        errorMsg += ": " + error;
+                    }
+                    showMessage(errorMsg, "error");
+                    console.log("完整错误响应:", xhr.responseText);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

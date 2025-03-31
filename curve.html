@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>设备监控页面</title>
+    <!-- 使用CDN引入jQuery -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <!-- 使用CDN引入Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 本地引入机智云SDK -->
+    <script src="js/gizwits_ws_0.3.0.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .data-panel { margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px; }
+        .data-value { font-size: 24px; font-weight: bold; }
+        .chart-container { width: 100%; max-width: 800px; margin: 20px auto; }
+        .control-panel { margin-top: 20px; padding: 15px; background: #f0f8ff; border-radius: 5px; }
+        button { padding: 8px 15px; margin-right: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>设备监控面板</h1>
+    
+    <div class="data-panel">
+        <h2>实时数据</h2>
+        <div>
+            <span>Value: </span>
+            <span id="value-display" class="data-value">--</span>
+        </div>
+        <div>
+            <span>PM: </span>
+            <span id="pm-display" class="data-value">--</span>
+        </div>
+        <div>
+            <span>温度: </span>
+            <span id="temp-display" class="data-value">--</span>
+        </div>
+        <div>
+            <span>湿度: </span>
+            <span id="humi-display" class="data-value">--</span>
+        </div>
+        <div>
+            <span>设备状态: </span>
+            <span id="device-status">--</span>
+        </div>
+    </div>
+    
+    <div class="chart-container">
+        <canvas id="data-chart"></canvas>
+    </div>
+    
+    <div class="control-panel">
+        <h2>设备控制</h2>
+        <button id="refresh-btn">刷新数据</button>
+    </div>
+    
+    <div class="log-panel" style="margin-top: 20px;">
+        <h3>通信日志</h3>
+        <div id="log-container" style="height: 200px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px;"></div>
+    </div>
+    
+    <script>
+        // 数据存储
+        let valueData = [];
+        let pmData = [];
+        let tempData = [];
+        let humiData = [];
+        let timeLabels = [];
+        const maxDataPoints = 30; // 图表显示的最大数据点数
+        let currentDeviceId = null;
+
+        // 初始化Chart.js图表
+        const ctx = document.getElementById('data-chart').getContext('2d');
+        const dataChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [
+                    {
+                        label: 'Value',
+                        data: valueData,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'PM',
+                        data: pmData,
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: '温度',
+                        data: tempData,
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: '湿度',
+                        data: humiData,
+                        borderColor: 'rgb(153, 102, 255)',
+                        backgroundColor: 'rgba(153, 102, 255, 0.1)',
+                        tension: 0.1,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: '数值'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: '湿度(%)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // 更新图表函数
+        function updateChart(value, pm, temp, humi) {
+            const now = new Date();
+            const timeStr = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
+            
+            // 添加新数据
+            valueData.push(value);
+            pmData.push(pm);
+            tempData.push(temp);
+            humiData.push(humi);
+            timeLabels.push(timeStr);
+            
+            // 限制数据点数
+            if (valueData.length > maxDataPoints) {
+                valueData.shift();
+                pmData.shift();
+                tempData.shift();
+                humiData.shift();
+                timeLabels.shift();
+            }
+            
+            // 更新图表
+            dataChart.update();
+        }
+
+        // 日志记录函数
+        function logMessage(message, isError = false) {
+            const logContainer = document.getElementById('log-container');
+            const logEntry = document.createElement('div');
+            logEntry.style.color = isError ? 'red' : 'black';
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // 从Cookie获取参数
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        // 初始化GizwitsWS对象
+        const gizwitsWS = new GizwitsWS(
+            'api.gizwits.com',
+            getCookie('phone'),
+            getCookie('Appid'),
+            'attrs_v4',
+            'ssl_socket'
+        );
+
+        // 设置回调函数
+        gizwitsWS.onInit = function(devices) {
+            logMessage('初始化成功，获取到设备列表');
+            console.log('设备列表:', devices);
+            
+            if (devices && devices.length > 0) {
+                currentDeviceId = devices[0].did;
+                logMessage(`找到设备: ${currentDeviceId}`);
+                
+                // 初始化设备状态为未知
+                document.getElementById('device-status').textContent = devices[0].is_online ? '在线' : '离线';
+                
+                // 自动连接设备
+                logMessage(`正在自动连接设备: ${currentDeviceId}`);
+                gizwitsWS.connect(currentDeviceId);
+            } else {
+                logMessage('没有绑定的设备', true);
+                document.getElementById('device-status').textContent = '无设备';
+            }
+        };
+
+        gizwitsWS.onConnected = function(did) {
+            logMessage(`WebSocket连接成功: ${did}`);
+        };
+
+        gizwitsWS.onOnlineStatus = function(res) {
+            const status = res.online ? '在线' : '离线';
+            logMessage(`设备状态变更: ${status} (DID: ${res.did})`);
+            document.getElementById('device-status').textContent = status;
+            
+            // 如果设备上线，自动读取状态
+            if (res.online && res.did === currentDeviceId) {
+                gizwitsWS.read(res.did);
+            }
+        };
+
+        gizwitsWS.onReceivedAttrs = function(res) {
+            logMessage(`收到设备数据: ${JSON.stringify(res.attrs)}`);
+            
+            if (res.attrs) {
+                // 更新显示
+                if (res.attrs.value !== undefined) {
+                    document.getElementById('value-display').textContent = res.attrs.value;
+                }
+                if (res.attrs.pm !== undefined) {
+                    document.getElementById('pm-display').textContent = res.attrs.pm;
+                }
+                if (res.attrs.temp !== undefined) {
+                    document.getElementById('temp-display').textContent = res.attrs.temp;
+                }
+                if (res.attrs.humi !== undefined) {
+                    document.getElementById('humi-display').textContent = res.attrs.humi;
+                }
+                
+                // 更新图表
+                const value = res.attrs.value !== undefined ? res.attrs.value : (valueData.length > 0 ? valueData[valueData.length-1] : 0);
+                const pm = res.attrs.pm !== undefined ? res.attrs.pm : (pmData.length > 0 ? pmData[pmData.length-1] : 0);
+                const temp = res.attrs.temp !== undefined ? res.attrs.temp : (tempData.length > 0 ? tempData[tempData.length-1] : 0);
+                const humi = res.attrs.humi !== undefined ? res.attrs.humi : (humiData.length > 0 ? humiData[humiData.length-1] : 0);
+                
+                updateChart(value, pm, temp, humi);
+            }
+        };
+
+        gizwitsWS.onDisconnected = function(res) {
+            logMessage(`连接断开: ${res.reason || '已断开'}`);
+            document.getElementById('device-status').textContent = '断开连接';
+            
+            // 自动尝试重新连接
+            if (currentDeviceId) {
+                setTimeout(function() {
+                    logMessage('尝试重新连接...');
+                    gizwitsWS.connect(currentDeviceId);
+                }, 3000); // 3秒后尝试重连
+            }
+        };
+        
+        gizwitsWS.onError = function(error) {
+            logMessage(`发生错误: ${error.message || JSON.stringify(error)}`, true);
+        };
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查是否有必要参数
+            const appId = getCookie('Appid');
+            const phoneId = getCookie('phone');
+            
+            if (!appId || !phoneId) {
+                alert('请先完成设备初始化设置');
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            logMessage('开始初始化...');
+            console.log('使用参数:', {appId, phoneId});
+            
+            // 初始化SDK
+            gizwitsWS.init();
+            
+            // 设置刷新按钮事件
+            document.getElementById('refresh-btn').addEventListener('click', function() {
+                if (currentDeviceId) {
+                    logMessage(`刷新设备数据: ${currentDeviceId}`);
+                    gizwitsWS.read(currentDeviceId);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
